@@ -1,0 +1,987 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Clanaogngag</title>
+	<style>
+td {
+	border: 1px solid #000;
+	padding: 1em;
+}
+svg.manual path, svg.manual circle {
+	fill: none;
+	stroke: #000;
+	stroke-width: 2;
+}
+svg.manual circle.fill {
+	fill: #000;
+}
+svg.manual circle.fillwhite {
+	fill: #fff;
+}
+dl {
+	display: flex;
+	flex-flow: column wrap;
+	max-height: 1200px;
+}
+dt, dd {
+	display: block;
+	height: 20px;
+	margin: 0;
+	padding: 0;
+}
+dd {
+	padding-left: 1em;
+	background-color: #eee;
+}
+	</style>
+	<script>
+function getSyllable() {
+	return "mnpk"[Math.floor(Math.random() * 4)] + "ieau"[Math.floor(Math.random() * 4)];
+}
+function getWord(len) {
+	let str = "";
+	for (let i = 0; i < len; i++) {
+		str += getSyllable();
+	}
+	return str;
+}
+function getList() {
+	let str = "";
+	for (let i = 0; i < 20; i++) {
+		str += getWord(Math.random() < .9 ? 2 : 3) + '\n';
+	}
+	return str;
+}
+	</script>
+	<script>
+'use strict';
+//var svg = document.createElement("svg");
+//svg.setAttribute("xmlns", "https://www.w3.org/2000/svg");
+var ds = {
+	i: "m 0 0 q 8 -4, 8 -16 t -8 -8 t -8 8 t 16 0 m -8 16",
+	e: "m 0 0 q -8 -4, -8 -16 t 8 -8 t 8 8 t -16 0 m 8 16",
+	a: "m 0 -24 q 8 4, 8 16 t -8 8 t -8 -8 t 16 0 m -8 8",
+	u: "m 0 -24 q -8 4, -8 16 t 8 8 t 8 -8 t -16 0 m 8 8",
+	m: "m -8 -24 l 8 24 l 8 -24 m -8 24",
+	n: "m -8 0 l 8 -24 l 8 24 m -8 0",
+	p: "m 0 0 v -24 m 0 24",
+	k: "m -8 0 l 16 -24 m -16 0 l 16 24 m -8 0"
+};
+function renderJson(json, w, h) {
+	var svgns = "http://www.w3.org/2000/svg";
+	var svg = document.createElementNS(svgns, "svg");
+	document.currentScript.parentNode.insertBefore(svg, document.currentScript);
+	svg.setAttribute("width", w);
+	svg.setAttribute("height", h);
+	for (var word of json) {
+		if (word.type == "word") {
+			var g = document.createElementNS(svgns, "g");
+			svg.appendChild(g);
+			g.setAttribute("transform", `translate(${word.x} ${word.y})`);
+			g.setAttribute("fill", "none");
+			g.setAttribute("stroke", "#000");
+			g.setAttribute("stroke-width", "2");
+			var orbitals = word.letters.split(" ");
+			for (var ring = 0; ring < word.rings.length; ring++) {
+				for (var i = 0; i < orbitals[ring].length; i++) {
+					var symbol = document.createElementNS(svgns, "path");
+					symbol.setAttribute("d", ds[orbitals[ring][i]]);
+					symbol.setAttribute("transform", `rotate(${-(i + .5) * 360 / orbitals[ring].length}) translate(0,${word.rings[ring]})`);
+					symbol.setAttribute("stroke-linecap", "round");
+					g.appendChild(symbol);
+				}
+				var circle = document.createElementNS(svgns, "circle");
+				circle.setAttribute("cx", 0);
+				circle.setAttribute("cy", 0);
+				circle.setAttribute("r", word.rings[ring]);
+				g.appendChild(circle);
+			}
+			circle = document.createElementNS(svgns, "circle");
+			circle.setAttribute("cx", 0);
+			circle.setAttribute("cy", 0);
+			circle.setAttribute("r", 4);
+			circle.setAttribute("fill", "#000");
+			circle.setAttribute("stroke", "none");
+			g.appendChild(circle);
+			symbol = document.createElementNS(svgns, "path");
+			symbol.setAttribute("d", "m 0 0 v" + word.rings[word.rings.length - 1]);
+			g.appendChild(symbol);
+			for (var connection of word.connections) {
+				var word2 = json[connection[0]];
+				var dx = word2.x - word.x;
+				var dy = word2.y - word.y;
+				// (mag - word.outerRadius - word2.outerRadius) / mag;
+				// 1 - (or + or2) / mag
+				var mag = Math.sqrt(dx * dx + dy * dy);
+				var sclBetween = 1 - (word.outerRadius + word2.outerRadius) / mag;
+				var sclInner = word.outerRadius / mag;
+				symbol = document.createElementNS(svgns, "path");
+				symbol.setAttribute("d", `m${dx * sclInner} ${dy * sclInner} l ${dx * sclBetween} ${dy * sclBetween}`);
+				g.appendChild(symbol);
+				var midpoint = {x: dx * sclInner + dx * sclBetween / 2, y: dy * sclInner + dy * sclBetween / 2};
+				var markingLineScale = 10;
+				dx /= mag;
+				dy /= mag;
+				if (connection[1] == 0) { // subject
+					/*
+					[ cos t -sin t ][x]
+					[ sin t  cos t ][y]
+					
+					[ x cos t - y sin t ]
+					[ x sin t + y cos t ]
+					*/
+					var ndx = -2 * dx + 1 * dy;
+					var ndy = -1 * dx - 2 * dy;
+					symbol = document.createElementNS(svgns, "path");
+					symbol.setAttribute("d", `m${midpoint.x} ${midpoint.y} l ${ndx * markingLineScale} ${ndy * markingLineScale}`);
+					g.appendChild(symbol);
+				}
+				else if (connection[1] == 1) { // object
+					var ndx = -2 * dx - 1 * dy;
+					var ndy = 1 * dx - 2 * dy;
+					symbol = document.createElementNS(svgns, "path");
+					symbol.setAttribute("d", `m${midpoint.x} ${midpoint.y} l ${ndx * markingLineScale} ${ndy * markingLineScale}`);
+					g.appendChild(symbol);
+				}
+				else if (connection[1] == 2) { // anything else - prepositions, adverbs, adjectives, lots of things. maybe in future there'll be more
+					var ndx = -2 * dx - 1 * dy;
+					var ndy = 1 * dx - 2 * dy;
+					symbol = document.createElementNS(svgns, "path");
+					symbol.setAttribute("d", `M${midpoint.x + 5 * dx} ${midpoint.y + 5 * dy} l ${ndx * markingLineScale} ${ndy * markingLineScale} M${midpoint.x - 5 * dx} ${midpoint.y - 5 * dy} l ${ndx * markingLineScale} ${ndy * markingLineScale}`);
+					g.appendChild(symbol);
+				}
+			}
+		}
+		else if (word.type == "numeric") {
+			var vec = {
+				x: Math.cos(word.dir * Math.PI / 180),
+				y: Math.sin(word.dir * Math.PI / 180)
+			};
+			var pvec = {
+				x: vec.x - vec.y,
+				y: vec.y + vec.x
+			};
+			var startX = json[word.connection].x + vec.x * json[word.connection].outerRadius;
+			var startY = json[word.connection].y + vec.y * json[word.connection].outerRadius;
+			var g = document.createElementNS(svgns, "g");
+			svg.appendChild(g);
+			g.setAttribute("transform", `translate(${startX} ${startY})`);
+			g.setAttribute("fill", "none");
+			g.setAttribute("stroke", "#000");
+			g.setAttribute("stroke-width", "2");
+			var path = document.createElementNS(svgns, "path");
+			var dstr = "m0 0 v 8";
+			if (word.starter == "scalar") {
+				// nothing here, just leave
+			}
+			else if (word.starter == "number") {
+				dstr += "m -16 0 q 16 16, 32 0 m -16 0 v 16";
+			}
+			else if (word.starter == "store") {
+				dstr += "m -16 0 q 16 16, 32 0 q -16 8, -32 0 m 16 0 v 16";
+			}
+			else if (word.starter == "retrieve") {
+				dstr += "v 16 m -16 0 q 16 -16, 32 0 q -16 -8, -32 0 m 16 0";
+			}
+			for (var num of word.letters) {
+				if (num == "0") {
+					dstr += "v 8 q 8 0, 8 -8 m -8 8 v 8";
+				}
+				else if (num == "1") {
+					dstr += "v 8 q 8 0, 8 8 m -8 -8 v 8";
+				}
+				else if (num == "2") {
+					dstr += "v 8 q -8 0, -8 -8 m 8 8 v 8";
+				}
+				else if (num == "3") {
+					dstr += "v 8 q -8 0, -8 8 m 8 -8 v 8";
+				}
+				else if (num == "-") {
+					dstr += "v 16 c -8 0, -8 -16, 0 -16 s 8 16, 0 16";
+				}
+				else if (num == ".") {
+					dstr += "v 8 m 8 0 h -16 m 8 0 v 8";
+				}
+				else {
+					dstr += "v16";
+				}
+			}
+			path.setAttribute("d", dstr);
+			path.setAttribute("transform", `rotate(${word.dir - 90})`);
+			g.appendChild(path);
+		}
+	}
+}
+	</script>
+</head>
+<body>
+	<h1>Lnangauage</h1>
+	<h2 id="about">About</h2>
+	<p>Goals:</p>
+	<ul>
+		<li>Have a pleasant and somewhat witchy and alien aesthetic.</li>
+		<li>Reflect my thought process.</li>
+		<li>Additional: base 4 everything. I swear it wasn't a goal at first, at least, but it's just working out that way and I want to continue with it.</li>
+		<li>Symbols should be easily recognizable at a small scale.</li>
+	</ul>
+	<p>Not goals, but if they happen to accidentally happen that's okay too:</p>
+	<ul>
+		<li>Sentence pronounceability. This language is not going to be basically linear. The way I speak is that I throw a bunch of words out with some order to them, and people usually get it. That strategy will probably be used for speakers of this language, although more complex meanings will need to be expressed by writing.</li>
+		<li>Unambiguosity. I want fun words like danger noodles to describe snakes, even though a danger noodle could be an exposed wire or something as well.</li>
+	</ul>
+	<h2 id="words">Phonology and writing letters and words</h2>
+	<p><code>/ieau mnpk/</code></p>
+	<p>All syllables are CV.</p>
+	<p>I'm not too good at SVGs, but here are some symbols (in the order that I put them in the IPA) and how they are put together to form a word:</p>
+	<svg xmlns="https://www.w3.org/2000/svg" width="192" height="192" id="letterlist" class="manual">
+		<path d="
+		M 0 64
+		h 12
+		q 8 -4, 8 -16 t -8 -8 t -8 8 t 16 0 m -8 16
+		h 24
+		q -8 -4, -8 -16 t 8 -8 t 8 8 t -16 0 m 8 16
+		h 24
+		m 0 -24 q 8 4, 8 16 t -8 8 t -8 -8 t 16 0 m -8 8
+		h 24
+		m 0 -24 q -8 4, -8 16 t 8 8 t 8 -8 t -16 0 m 8 8
+		h 24
+		m -8 -24 l 8 24 l 8 -24 m -8 24
+		h 24
+		m -8 0 l 8 -24 l 8 24 m -8 0
+		h 24
+		v -24 m 0 24
+		h 24
+		m -8 0 l 16 -24 m -16 0 l 16 24 m -8 0
+		h 12
+		"></path>
+	</svg>
+	<svg xmlns="https://www.w3.org/2000/svg" width="192" height="192" id="wordex" class="manual">
+		<path transform="translate(96 96) rotate(  0) translate(0 40)" d="m 0 0 q 8 -4, 8 -16 t -8 -8 t -8 8 t 16 0 m -8 16"></path>
+		<path transform="translate(96 96) rotate( 60) translate(0 40)" d="m 0 0 v -24 m 0 24"></path>
+		<path transform="translate(96 96) rotate(120) translate(0 40)" d="m 0 -24 q -8 4, -8 16 t 8 8 t 8 -8 t -16 0 m 8 8"></path>
+		<path transform="translate(96 96) rotate(180) translate(0 40)" d="m -8 -24 l 8 24 l 8 -24 m -8 24"></path>
+		<path transform="translate(96 96) rotate(240) translate(0 40)" d="m 0 0 q -8 -4, -8 -16 t 8 -8 t 8 8 t -16 0 m 8 16"></path>
+		<path transform="translate(96 96) rotate(300) translate(0 40)" d="m -8 0 l 8 -24 l 8 24 m -8 0"></path>
+		<path transform="translate(96 96) rotate(330) translate(0 40)" d="m 0 0 v -40 m 0 40"></path>
+		<circle cx="96" cy="96" r="40"></circle>
+		<circle cx="96" cy="96" r="4" class="fill"></circle>
+	</svg>
+	<p>The loops don't even have to be connected on the vowels; as long as there's at least like half a loop there it's okay.</p>
+	<p>The start of the word is counterclockwise from the stick that connects the middle to the circle, and it goes counterclockwise from there. If there's more than one ring, then the line that connects to the center just keeps on going and you read the inner ring first and then go out. In this way, when writing these circles, you're free to move characters around the orbitals so that the word is fun to look at, as long as the order of the characters remains the same.</p>
+	<h2>Reading direction</h2>
+	<p>The reading direction is whatever the medium vibes with. In the instance of a web page, the text flows down with the page. If it's on the ground in a temple in my imaginary world, it goes upward so that you can read it while walking.</p>
+	<h2 id="sentences">Grammar and writing sentences</h2>
+	<p>2d grammar lol</p>
+	<p>Subjects, objects, and the "literally anything else" category are marked with different symbols on the connecting lines between words.</p>
+	<script>
+renderJson([
+	{
+		"type": "word",
+		"x": 80,
+		"y": 80,
+		"rings": [30, 60],
+		"outerRadius": 60,
+		"letters": getWord(1) + " " + getWord(3),
+		"connections": [[1,0]]
+	},
+	{
+		"type": "word",
+		"x": 320,
+		"y": 160,
+		"rings": [40],
+		"outerRadius": 40,
+		"letters": getWord(3),
+		"connections": []
+	},
+	{
+		"type": "word",
+		"x": 300,
+		"y": 300,
+		"rings": [40],
+		"outerRadius": 40,
+		"letters": getWord(3),
+		"connections": [[1,1]]
+	},
+	{
+		"type": "word",
+		"x": 160,
+		"y": 320,
+		"rings": [40],
+		"outerRadius": 40,
+		"letters": getWord(3),
+		"connections": [[2,2]]
+	},
+	{
+		"type": "word",
+		"x": 120,
+		"y": 200,
+		"rings": [40],
+		"outerRadius": 40,
+		"letters": getWord(3),
+		"connections": [[1,2]]
+	},
+	{
+		"type": "scalar",
+		"dir": 30,
+		"letters": ".0123",
+		"connection": 1
+	}
+], 512, 400);
+	</script>
+	<p>The subject, the big word in this instance, is indicated as the subject by the left half of an arrow on the line going to the verb. The object has a right have of an arrow, and the adverb and adjective have two right halves.</p>
+	<h2>Vocabulary</h2>
+	<p>randomly generated mostly because I'm super indecisive, but I've touched up a few things. original list from <a href="https://forum.duolingo.com/comment/4571123">duolingo</a>. I've made a few cognates, such as kanine meaning dog and the word for water being derived from Nokama, a Bionicle thing. I really do need to work on this more because I want a system that will be expained later on to work.</p>
+	<p>Pretty much homogeneous to the eye if you don't have particularly good eyesight:</p>
+	<dl>
+		<dt>nukama</dt>
+		<dd>water, reflective</dd>
+		<dt>mekama</dt>
+		<dd>blood</dd>
+		<dt>pakama</dt>
+		<dd>fire</dd>
+		<dt>pukama</dt>
+		<dd>stone/rock</dd>
+		<dt>kenama</dt>
+		<dd>flesh/meat</dd>
+		<dt>kamipi</dt>
+		<dd>grease/fat</dd>
+		<dt>pumune</dt>
+		<dd>smoke</dd>
+		<dt>nipepa</dt>
+		<dd>ash/soot</dd>
+		<dt>mipama</dt>
+		<dd>sand</dd>
+		<dt>minuka</dt>
+		<dd>wood</dd>
+		<dt>papiku</dt>
+		<dd>earth/soil</dd>
+		<dt>mumamu</dt>
+		<dd>salt</dd>
+		<dt>pimume</dt>
+		<dd>cloud, fog</dd>
+		<dt>munuke</dt>
+		<dd>powder</dd>
+		<dt>pinaka</dt>
+		<dd>shade/shadow</dd>
+	</dl>
+	<p>Animals:</p>
+	<dl>
+		<dt>kanine</dt>
+		<dd>dog</dd>
+		<dt>panine</dt>
+		<dd>cat</dd>
+		<dt>penine</dt>
+		<dd>fish</dd>
+		<dt>kinine</dt>
+		<dd>louse/flea</dd>
+		<dt>nenine</dt>
+		<dd>bird</dd>
+		<dt>nunine</dt>
+		<dd>ant</dd>
+		<dt>kunine</dt>
+		<dd>pig</dd>
+	</dl>
+	<p>Body parts:</p>
+	<dl>
+		<dt>napena</dt>
+		<dd>head</dd>
+		<dt>mamipu</dt>
+		<dd>belly/abdomen</dd>
+		<dt>nenaki</dt>
+		<dd>navel</dd>
+		<dt>pumiki</dt>
+		<dd>heart/core</dd>
+		<dt>menune</dt>
+		<dd>back</dd>
+		<dt>mamumu</dt>
+		<dd>thigh</dd>
+		<dt>mupeme</dt>
+		<dd>wing</dd>
+		<dt>napapa</dt>
+		<dd>nail/claw</dd>
+		<dt>mikuku</dt>
+		<dd>hand</dd>
+		<dt>numumi</dt>
+		<dd>arm</dd>
+		<dt>kakipe</dt>
+		<dd>eye</dd>
+		<dt>kupaka</dt>
+		<dd>ear</dd>
+		<dt>kenumi</dt>
+		<dd>nose</dd>
+		<dt>kinemi</dt>
+		<dd>tongue</dd>
+		<dt>mikemi</dt>
+		<dd>tooth</dd>
+		<dt>kimaka</dt>
+		<dd>bone</dd>
+		<dt>papenu</dt>
+		<dd>horn</dd>
+		<dt>kukeku</dt>
+		<dd>tail</dd>
+		<dt>mamiku</dt>
+		<dd>egg</dd>
+		<dt>numaku</dt>
+		<dd>leaf</dd>
+		<dt>ninumu</dt>
+		<dd>liver</dd>
+		<dt>pememi</dt>
+		<dd>skin/hide</dd>
+		<dt>nikapi</dt>
+		<dd>knee</dd>
+		<dt>kepume</dt>
+		<dd>breast/chest</dd>
+		<dt>menuma</dt>
+		<dd>hair/fur</dd>
+		<dt>munimi</dt>
+		<dd>mouth</dd>
+		<dt>kikike</dt>
+		<dd>neck</dd>
+		<dt>kemanu</dt>
+		<dd>leg</dd>
+		<dt>penino</dt>
+		<dd>foot</dd>
+		<dt>panuki</dt>
+		<dd>feather</dd>
+		<dt>kakapa</dt>
+		<dd>root</dd>
+		<dt>kekepi</dt>
+		<dd>seed</dd>
+		<dt>nanemu</dt>
+		<dd>flower/blossom</dd>
+		<dt>nemepe</dt>
+		<dd>bark/husk</dd>
+	</dl>
+	<p>Big things:</p>
+	<dl>
+		<dt>kapaku</dt>
+		<dd>mountain</dd>
+		<dt>nekapu</dt>
+		<dd>tree</dd>
+		<dt>mipipa</dt>
+		<dd>path/road</dd>
+		<dt>pakepa</dt>
+		<dd>rain</dd>
+		<dt>minume</dt>
+		<dd>wind</dd>
+		<dt>kemumu</dt>
+		<dd>year</dd>
+		<dt>nepapi</dt>
+		<dd>house</dd>
+		<dt>pemene</dt>
+		<dd>grass/lawn</dd>
+	</dl>
+	<p>Celestial nouns:</p>
+	<dl>
+		<dt>pemimu</dt>
+		<dd>night/evening</dd>
+		<dt>mepike</dt>
+		<dd>day</dd>
+		<dt>kenake</dt>
+		<dd>star</dd>
+		<dt>kinuka</dt>
+		<dd>sun</dd>
+		<dt>mukemu</dt>
+		<dd>moon</dd>
+		<dt>nimime</dt>
+		<dd>name</dd>
+		<dt>mepapi</dt>
+		<dd>home</dd>
+		<dt>manupa</dt>
+		<dd>sea/ocean</dd>
+	</dl>
+	<p>Adjectives and things that are adjectives if they have scalars which I'll get into later:</p>
+	<dl>
+		<dt>nunupi</dt>
+		<dd>young</dd>
+		<dt>kepina</dt>
+		<dd>new</dd>
+		<dt>nepami</dt>
+		<dd>full</dd>
+		<dt>kunune</dt>
+		<dd>good</dd>
+		<dt>nupaku</dt>
+		<dd>long</dd>
+		<dt>kakune</dt>
+		<dd>red</dd>
+		<dt>kupama</dt>
+		<dd>blue</dd>
+		<dt>kepape</dt>
+		<dd>white</dd>
+		<dt>nekinu</dt>
+		<dd>green</dd>
+		<dt>munenu</dt>
+		<dd>yellow</dd>
+		<dt>nukame</dt>
+		<dd>size</dd>
+		<dt>namipe</dt>
+		<dd>wideness/broadness</dd>
+		<dt>pupepu</dt>
+		<dd>weight</dd>
+		<dt>kupeka</dt>
+		<dd>age</dd>
+		<dt>nununa</dt>
+		<dd>speed</dd>
+		<dt>kumani</dt>
+		<dd>right/correct/proper</dd>
+		<dt>nimaku</dt>
+		<dd>bad/wrong</dd>
+		<dt>munanu</dt>
+		<dd>far/distant</dd>
+		<dt>kukupi</dt>
+		<dd>hard (not soft)</dd>
+		<dt>pimapu</dt>
+		<dd>thick</dd>
+		<dt>kemuna</dt>
+		<dd>thin</dd>
+		<dt>kakanu</dt>
+		<dd>narrow</dd>
+		<dt>pupumu</dt>
+		<dd>sweet</dd>
+		<dt>kimeku</dt>
+		<dd>bitter</dd>
+		<dt>kekake</dt>
+		<dd>hot</dd>
+		<dt>pinema</dt>
+		<dd>cold</dd>
+		<dt>kukemi</dt>
+		<dd>wet</dd>
+		<dt>nukunu</dt>
+		<dd>smooth</dd>
+		<dt>kunenu</dt>
+		<dd>sharp</dd>
+		<dt>pakipi</dt>
+		<dd>dull (not sharp)</dd>
+		<dt>penapa</dt>
+		<dd>dirty</dd>
+		<dt>kakupi</dt>
+		<dd>short</dd>
+		<dt>napemi</dt>
+		<dd>round</dd>
+		<dt>pekima</dt>
+		<dd>male</dd>
+		<dt>makipe</dt>
+		<dd>female</dd>
+		<dt>pakipe</dt>
+		<dd>much/many</dd>
+		<dt>kepime</dt>
+		<dd>true</dd>
+		<dt>kepeme</dt>
+		<dd>false</dd>
+	</dl>
+	<p>Abstract and uncategorized nouns:</p>
+	<dd>
+		<dt>numupi</dt>
+		<dd>noodle</dd>
+		<dt>kenemi</dt>
+		<dd>dangerous</dd>
+		<dt>namupa</dt>
+		<dd>all</dd>
+		<dt>nakuma</dt>
+		<dd>instance/occurrence</dd>
+		<dt>mikuni</dt>
+		<dd>parent</dd>
+		<dt>penimi</dt>
+		<dd>sibling</dd>
+		<dt>paniku</dt>
+		<dd>spouse</dd>
+		<dt>napeme</dt>
+		<dd>other/another/others</dd>
+		<dt>pinapa</dt>
+		<dd>no/none/no-one</dd>
+		<dt>ponemo</dt>
+		<dd>place</dd>
+		<dt>nemopo</dt>
+		<dd>time</dd>
+		<dt>nanupe</dt>
+		<dd>yesterday</dd>
+	</dl>
+	<p>Verbs:</p>
+	<dl>
+		<dt>meninu</dt>
+		<dd>cause</dd>
+		<dt>moninu</dt>
+		<dd>die</dd>
+		<dt>kinipe</dt>
+		<dd>see</dd>
+		<dt>kipimi</dt>
+		<dd>look</dd>
+		<dt>mamuna</dt>
+		<dd>hear</dd>
+		<dt>memana</dt>
+		<dd>know</dd>
+		<dt>pupapi</dt>
+		<dd>drink</dd>
+		<dt>kumimi</dt>
+		<dd>give</dd>
+		<dt>namepu</dt>
+		<dd>come</dd>
+		<dt>kukanu</dt>
+		<dd>stand</dd>
+		<dt>pipenu</dt>
+		<dd>sit/set</dd>
+		<dt>pumemu</dt>
+		<dd>lie/lay</dd>
+		<dt>nakame</dt>
+		<dd>fly</dd>
+		<dt>kemuna</dt>
+		<dd>eat</dd>
+		<dt>kepime</dt>
+		<dd>bite</dd>
+		<dt>pimunu</dt>
+		<dd>burn</dd>
+		<dt>kemuku</dt>
+		<dd>kill</dd>
+		<dt>pakapi</dt>
+		<dd>talk</dd>
+		<dt>makipa</dt>
+		<dd>laugh</dd>
+		<dt>mupina</dt>
+		<dd>do/make</dd>
+		<dt>papipu</dt>
+		<dd>be</dd>
+		<dt>nupake</dt>
+		<dd>become/get</dd>
+		<dt>nameme</dt>
+		<dd>have</dd>
+		<dt>kamemu</dt>
+		<dd>want</dd>
+		<dt>manunu</dt>
+		<dd>can/be-able-to</dd>
+		<dt>pinepu</dt>
+		<dd>think/consider</dd>
+		<dt>nepuke</dt>
+		<dd>go</dd>
+		<dt>pakime</dt>
+		<dd>walk/run</dd>
+		<dt>pupini</dt>
+		<dd>take</dd>
+		<dt>ninene</dt>
+		<dd>carry/wear</dd>
+		<dt>kikapa</dt>
+		<dd>tie/bind</dd>
+		<dt>pipuki</dt>
+		<dd>hide</dd>
+		<dt>mepaka</dt>
+		<dd>fall</dd>
+		<dt>kunuka</dt>
+		<dd>cry/weep</dd>
+		<dt>nenapa</dt>
+		<dd>blow</dd>
+		<dt>nenina</dt>
+		<dd>suck</dd>
+		<dt>nunuku</dt>
+		<dd>hit/beat</dd>
+		<dt>kenena</dt>
+		<dd>crush/grind</dd>
+		<dt>mumupi</dt>
+		<dd>live</dd>
+		<dt>pupinu</dt>
+		<dd>work</dd>
+		<dt>mimima</dt>
+		<dd>sleep</dd>
+		<dt>numimu</dt>
+		<dd>play</dd>
+		<dt>kuniki</dt>
+		<dd>swim</dd>
+		<dt>nakumi</dt>
+		<dd>hunt</dd>
+		<dt>kenime</dt>
+		<dd>dance</dd>
+		<dt>memupu</dt>
+		<dd>sing</dd>
+		<dt>nimumu</dt>
+		<dd>count</dd>
+		<dt>namiki</dt>
+		<dd>vomit</dd>
+	</dl>
+	<p>Rather general nouns and pronouns:</p>
+	<dl>
+		<dt>kupupa</dt>
+		<dd>animal</dd>
+		<dt>punina</dt>
+		<dd>person/human</dd>
+		<dt>mipiki</dt>
+		<dd>I/me</dd>
+		<dt>pukeku</dt>
+		<dd>you</dd>
+		<dt>kukepu</dt>
+		<dd>what/which</dd>
+		<dt>nukunu</dt>
+		<dd>this/these</dd>
+		<dt>nukuni</dt>
+		<dd>that/those</dd>
+		<dt>mikini</dt>
+		<dd>we/us</dd>
+		<dt>kupima</dt>
+		<dd>it/they/them/the</dd>
+	</dl>
+	<p>Prepositions:</p>
+	<dl>
+		<dt>pumuna</dt>
+		<dd>at/in/on</dd>
+		<dt>numaku</dt>
+		<dd>to/toward</dd>
+		<dt>nakemi</dt>
+		<dd>of/from/'s (possessive)</dd>
+		<dt>kepuku</dt>
+		<dd>through</dd>
+		<dt>kipepu</dt>
+		<dd>with (adv: with regard to)</dd>
+		<dt>kinipi</dt>
+		<dd>over/above/on</dd>
+		<dt>punipu</dt>
+		<dd>for/in-order-to</dd>
+	</dl>
+	<p>Adverbs:</p>
+	<dl>
+		<dt>namemi</dt>
+		<dd>promptly</dd>
+		<dt>mipipi</dt>
+		<dd>presently</dd>
+		<dt>kipime</dt>
+		<dd>pastly</dd>
+		<dt>manipi</dt>
+		<dd>futurely</dd>
+		<dt>nukeni</dt>
+		<dd>actively</dd>
+	</dl>
+	<p>Other:</p>
+	<dl>
+		<dt>pukike</dt>
+		<dd>and</dd>
+		<dt>nenenu</dt>
+		<dd>or</dd>
+		<dt>kapipa</dt>
+		<dd>but/yet/except</dd>
+	</dl>
+	<p>Hearing actively is listening. Ditto for seeing and watching, and looking (absent-mindedly keeping an eye out) and searching. Dreaming is inactive thinking. Speaking and saying is active talking.</p>
+	<p>When making comparisons with be, unless there's a clear subject, everyone's an object.</p>
+	<p>Gendered pronouns are no.</p>
+	<p>Reflexive verbs are handled with two lines going to a verb, one as object, and one as subject; reflexive pronouns are unnecessary.</p>
+	<p>Worms are dirt noodles, snakes are danger noodles, rivers are fast big water noodles. Grease is liquid fat. Snow is water powder, and ice is water rock.</p>
+	<h2>Scalars and numbers</h2>
+	<p>Scalars are numbers that are applied to descriptors directly. Say that you wanted an object that was between red and black: you just add the color red, and put the scalar .5 on red. (black is, with regard to color, the default. Adding red makes it red, like adding the color codes #000 and #f00 gives #f00. Multiplying #f00 by .5 yields something close to #700 - between red and black). In order to make something like purple, one would have scalared red and blue adjectives.</p>
+	<p>This is also used for measurement: you apply a scalar to something like 'meters' and you get the thingy.</p>
+	<p>Base 4 radix, most significant numerals toward the word. The negative sign is a bit complicated. If the negative sign is at the start of a number, it's a regular negative number. However, if it's not at the start, it's treated like a numeral. <code>-.123</code> is what you'd expect for a regular base 4, about -.42 in our base 10 system, but <code>0-.123</code> is -1 + .123, another way of writing <code>-.211</code>.</p>
+	<p>The below example shows how <code>0-.0123</code> is written:</p>
+	<script>
+renderJson([
+	{
+		"type": "word",
+		"x": 50,
+		"y": 50,
+		"rings": [40],
+		"outerRadius": 40,
+		"letters": getWord(3),
+		"connections": []
+	},
+	{
+		"type": "numeric",
+		"starter": "scalar",
+		"dir": 30,
+		"letters": "0-.0123",
+		"connection": 0
+	}
+], 192, 144);
+	</script>
+	<p>You can put two scalars on a word to define a range. You'll also be able to plop numbers through set notation verbs if you want to be really descriptive and fancy about things.</p>
+	<p>If you want to store something into a numeric id as a replacement for pronouns, this is the usage:</p>
+	<script>
+renderJson([
+	{
+		"type": "word",
+		"x": 50,
+		"y": 50,
+		"rings": [40],
+		"outerRadius": 40,
+		"letters": getWord(3),
+		"connections": []
+	},
+	{
+		"type": "numeric",
+		"starter": "store",
+		"dir": 30,
+		"letters": "123",
+		"connection": 0
+	}
+], 192, 144);
+	</script>
+	<p>And if you would like to retrieve a meaning from a numeric id:</p>
+	<script>
+renderJson([
+	{
+		"type": "word",
+		"x": 50,
+		"y": 50,
+		"rings": [40],
+		"outerRadius": 40,
+		"letters": getWord(3),
+		"connections": []
+	},
+	{
+		"type": "numeric",
+		"starter": "retrieve",
+		"dir": 30,
+		"letters": "123",
+		"connection": 0
+	}
+], 192, 144);
+	</script>
+	<p>You can draw these numeric things on a curvy line, I just didn't feel up to finding a way to do that with automatically-generated SVGs.</p>
+	<h2>Gender and sex</h2>
+	<p>There's decidedly no word to identify birth sex other than "I have middle noodle" or "I had middle noodle when I was born" or something; the words for male and female only refer to gender.</p>
+	<p>Gender is one reason why I implemented the scalar system and pronoun replacement system and this whole entire conlang. Plop one scalar on female going from 0 to 1, connect that to a person, plop another scalar that goes from 0 to 0.5 on male, connect that to the same person, and now you've got what I've narrowed myself down to.</p>
+	<h2>Translations</h2>
+	<p>~~edgy time~~</p>
+	<p>I see a boy in the mirror, but that boy is not me. His movements mirror my own, but there is a strange distance between myself and him, an impermeable alienness. He is truly someone else, and, yet, I can only pretend he is. This illusion, this falsehood, is not a negative feeling. It's the one thing that I can hold on to in order to prevent hurt. But now I realize that I don't hold on to anything. It is he who lives my life, it is I who am living his, and I am lost for something to anchor myself with.</p>
+	<p>[incomplete, I'm working on a tool that allows the creation of these sentences using HTML5 canvas so that I don't have to manually do the JSON files myself]</p>
+	<script>
+renderJson([
+    {
+        "type": "word",
+        "x": 146,
+        "y": 207,
+        "rings": [
+            40
+        ],
+        "outerRadius": 40,
+        "letters": "mipiki",
+        "connections": [
+            [
+                1,
+                0
+            ],
+            [
+                6,
+                1
+            ]
+        ]
+    },
+    {
+        "type": "word",
+        "x": 216,
+        "y": 62,
+        "rings": [
+            40
+        ],
+        "outerRadius": 40,
+        "letters": "kinipe",
+        "connections": []
+    },
+    {
+        "type": "word",
+        "x": 364,
+        "y": 112,
+        "rings": [
+            40
+        ],
+        "outerRadius": 40,
+        "letters": "punina",
+        "connections": [
+            [
+                1,
+                1
+            ],
+            [
+                6,
+                1
+            ]
+        ]
+    },
+    {
+        "type": "word",
+        "x": 533,
+        "y": 58,
+        "rings": [
+            40
+        ],
+        "outerRadius": 40,
+        "letters": "pekima",
+        "connections": [
+            [
+                2,
+                2
+            ]
+        ]
+    },
+    {
+        "type": "word",
+        "x": 65,
+        "y": 55,
+        "rings": [
+            40
+        ],
+        "outerRadius": 40,
+        "letters": "kepuku",
+        "connections": [
+            [
+                1,
+                2
+            ]
+        ]
+    },
+    {
+        "type": "word",
+        "x": 44,
+        "y": 183,
+        "rings": [
+            40
+        ],
+        "outerRadius": 40,
+        "letters": "nukama",
+        "connections": [
+            [
+                4,
+                2
+            ]
+        ]
+    },
+    {
+        "type": "word",
+        "x": 309,
+        "y": 249,
+        "rings": [
+            40
+        ],
+        "outerRadius": 40,
+        "letters": "nepuke",
+        "connections": [
+            [
+                7,
+                2
+            ]
+        ]
+    },
+    {
+        "type": "word",
+        "x": 445,
+        "y": 195,
+        "rings": [
+            40
+        ],
+        "outerRadius": 40,
+        "letters": "kepeme",
+        "connections": []
+    },
+    {
+        "type": "word",
+        "x": 251,
+        "y": 142,
+        "rings": [
+            40
+        ],
+        "outerRadius": 40,
+        "letters": "ponemo",
+        "connections": [
+            [
+                6,
+                2
+            ]
+        ]
+    }
+], 600, 600);
+	</script>
+</body>
+</html>
