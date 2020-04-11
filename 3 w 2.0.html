@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="utf-8">
+	<title>Clanaogngag</title>
+	<style>
+body {
+	margin: 0;
+}
+#div {
+	padding: 5px;
+	background-color: #ccc;
+}
+#canvas {
+	display: block;
+}
+input {
+	display: block;
+}
+	</style>
+</head>
+<body>
+	<canvas id="canvas"></canvas>
+	<div id="div"><input id="letteredit"></div>
+	<textarea id="textarea"></textarea>
+	<script>
+'use strict';
+var json = [];
+var divwrap = document.getElementById("div");
+var letteredit = document.getElementById("letteredit");
+var canvas = document.getElementById("canvas");
+var ctx = canvas.getContext("2d");
+canvas.width = 600;
+canvas.height = 600;
+function drawAll() {
+	ctx.clearRect(0, 0, canvas.width, canvas.height);
+	for (var unit of json) {
+		if (unit.type == "word") {
+			ctx.beginPath();
+			ctx.lineWidth = 2;
+			ctx.arc(unit.x, unit.y, unit.outerRadius, 0, 2 * Math.PI);
+			ctx.stroke();
+			ctx.closePath();
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
+			ctx.fillText(unit.letters, unit.x, unit.y);
+			for (var connection of unit.connections) {
+				var dx = json[connection[0]].x - unit.x;
+				var dy = json[connection[0]].y - unit.y;
+				var mag = Math.sqrt(dx * dx + dy * dy);
+				var ndx = dx / mag;
+				var ndy = dy / mag;
+				var magScl = (mag - json[connection[0]].outerRadius) / mag;
+				var startPoint = {x: unit.x + unit.outerRadius * ndx, y: unit.y + unit.outerRadius * ndy};
+				var endPoint = {x: unit.x + dx * magScl, y: unit.y + dy * magScl};
+				ctx.beginPath();
+				ctx.moveTo(startPoint.x, startPoint.y);
+				ctx.lineTo(endPoint.x, endPoint.y);
+				ctx.stroke();
+				ctx.closePath();
+				var midpoint = {x: (startPoint.x + endPoint.x) / 2, y: (startPoint.y + endPoint.y) / 2};
+				if (connection[1] == 0) {
+					ctx.beginPath();
+					ctx.moveTo(midpoint.x, midpoint.y);
+					ctx.lineTo(midpoint.x - 12 * ndx + 6 * ndy, midpoint.y - 12 * ndy - 6 * ndx);
+					ctx.stroke();
+					ctx.closePath();
+				}
+				else if (connection[1] == 1) {
+					ctx.beginPath();
+					ctx.moveTo(midpoint.x, midpoint.y);
+					ctx.lineTo(midpoint.x - 12 * ndx - 6 * ndy, midpoint.y - 12 * ndy + 6 * ndx);
+					ctx.stroke();
+					ctx.closePath();
+				}
+				else if (connection[1] == 2) {
+					ctx.beginPath();
+					ctx.moveTo(midpoint.x, midpoint.y);
+					ctx.lineTo(midpoint.x - 12 * ndx - 6 * ndy, midpoint.y - 12 * ndy + 6 * ndx);
+					var mdx = ndx * 6;
+					var mdy = ndy * 6;
+					ctx.moveTo(midpoint.x + mdx, midpoint.y + mdy);
+					ctx.lineTo(midpoint.x - 12 * ndx - 6 * ndy + mdx, midpoint.y - 12 * ndy + 6 * ndx + mdy);
+					ctx.stroke();
+					ctx.closePath();
+				}
+			}
+		}
+		else if (unit.type == "numeric") {
+			var x = json[unit.connection].x + 60 * Math.cos(unit.dir * Math.PI / 180);
+			var y = json[unit.connection].y + 60 * Math.sin(unit.dir * Math.PI / 180);
+			ctx.beginPath();
+			ctx.lineWidth = 2;
+			ctx.arc(x, y, 20, 0, 2 * Math.PI);
+			ctx.stroke();
+			ctx.closePath();
+			ctx.textAlign = "center";
+			ctx.textBaseline = "middle";
+			ctx.fillText(unit.letters, x, y);
+		}
+	}
+	textarea.value = JSON.stringify(json);
+}
+var startClick = {x: 0, y: 0, unit: -1};
+var keys = [];
+addEventListener("keydown", function(e) {
+	keys[e.key] = true;
+}, false);
+addEventListener("keyup", function(e) {
+	keys[e.key] = false;
+}, false);
+function mouseIsOver(i, x, y) {
+	if (json[i].type == "word") {
+		return (json[i].x - x) ** 2 + (json[i].y - y) ** 2 <= json[i].outerRadius ** 2;
+	}
+	else if (json[i].type == "numeric") {
+		var cx = json[json[i].connection].x + 60 * Math.cos(json[i].dir * Math.PI / 180);
+		var cy = json[json[i].connection].y + 60 * Math.sin(json[i].dir * Math.PI / 180);
+		return (cx - x) ** 2 + (cy - y) ** 2 <= 400;
+	}
+	else {
+		console.warn("type of unit is invalid, " + json[i].type);
+	}
+}
+canvas.addEventListener("mousedown", function(e) {
+	var x = e.pageX - canvas.offsetLeft;
+	var y = e.pageY - canvas.offsetTop;
+	var newUnit = 0;
+	for (var i = 0; i < json.length; i++) {
+		if (mouseIsOver(i, x, y)) {
+			newUnit = i;
+			letteredit.value = json[newUnit].letters;
+			break;
+		}
+	}
+	if (keys.a) { // I know I could do OOP
+		json.push({
+			"type": "word",
+			"x": x,
+			"y": y,
+			"rings": [40],
+			"outerRadius": 40,
+			"letters": "nimime",
+			"connections": []
+		});
+		newUnit = json.length - 1;
+	}
+	else if (keys.s) { // this is why you code while tired
+		json.push({
+			"type": "numeric",
+			"starter": "scalar",
+			"dir": 30,
+			"letters": "123",
+			"connection": 0
+		});
+		newUnit = json.length - 1;
+	}
+	else if (keys.q) { // I know I could do OOP
+		if (json[newUnit].type == "word") {
+			json[newUnit].connections = [];
+		}
+	}
+	else if (keys.w || keys.e || keys.r) {
+		if (startClick.unit != newUnit) {
+			if (json[startClick.unit].type == "word") {
+				json[startClick.unit].connections.push([newUnit, keys.w ? 0 : keys.e ? 1 : 2]);
+			}
+			else if (json[startClick.unit].type == "numeric") {
+				json[startClick.unit].connection = newUnit;
+				json[startClick.unit].starter = keys.w ? "scalar" : keys.e ? "store" : "retrieve";
+			}
+		}
+	}
+	else if (keys.x) {
+		if (json.length) { // just being safe here, it works without this
+			for (var unit of json) {
+				if (unit.type == "word") {
+					for (var i = 0; i < unit.connections.length; i++) {
+						if (unit.connections[i][0] == newUnit) {
+							unit.connections.splice(i, 1);
+							i--;
+						}
+						else if (unit.connections[i][0] == json.length - 1) {
+							unit.connections[i][0] = newUnit;
+						}
+					}
+				}
+			}
+			if (newUnit >= json.length - 1) {
+				json.pop();
+				newUnit--;
+			}
+			else {
+				json[newUnit] = json.pop();
+			}
+		}
+	}
+	startClick.x = x;
+	startClick.y = y;
+	startClick.unit = newUnit;
+}, false);
+canvas.addEventListener("mouseup", function(e) {
+	if (json.length) {
+		var x = e.pageX - canvas.offsetLeft;
+		var y = e.pageY - canvas.offsetTop;
+		var unit = json[startClick.unit];
+		if (unit.type == "word") {
+			json[startClick.unit].x += x - startClick.x;
+			json[startClick.unit].y += y - startClick.y;
+		}
+		else if (unit.type == "numeric") {
+			unit.dir = Math.atan2(y - json[unit.connection].y, x - json[unit.connection].x) * 180 / Math.PI;
+		}
+	}
+	drawAll();
+}, false);
+textarea.addEventListener("dblclick", function(e) {
+	json = JSON.parse(textarea.value);
+	textarea.blur();
+	drawAll();
+}, false);
+letteredit.addEventListener("input", function(e) {
+	json[startClick.unit].letters = letteredit.value;
+	drawAll();
+}, false);
+var dict = `nukama
+water/liquid
+
+pakama
+fire
+
+pukama
+rock/solid
+
+kinipe
+see
+
+nepuke
+be
+
+meninu
+cause
+
+mumupi
+survive
+
+punina
+person
+
+pekima
+male
+
+makipe
+female
+
+mipiki
+I/me
+
+mepeke
+true
+
+kepeme
+false
+
+kepuku
+through
+
+nemupu
+time
+
+punemu
+place
+
+nimime
+name
+
+pimume
+cloud
+
+nimiki
+bad
+
+kimini
+good`.split("\n\n").map(x => x.split("\n"));
+// thanks to My Little Pony for the Kirin/Nirik distinciton
+	</script>
+</body>
+</html>
